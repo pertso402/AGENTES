@@ -1,0 +1,20 @@
+{
+  "name": "agente-demo-atendimento",
+  "version": "1.0.0",
+  "description": "Agente de atendimento WhatsApp multi-tenant para demonstração ao vivo",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "node scripts/testar.js",
+    "check": "node --check src/index.js && node --check src/agente.js && node --check src/db.js && node --check src/precos.js && node --check src/evolution.js && node --check src/ferramentas.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "axios": "^1.7.7",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "form-data": "^4.0.0"
+  },
+  "engines": { "node": ">=18.0.0" }
+}
