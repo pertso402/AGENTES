@@ -1,6 +1,7 @@
 'use strict';
 
 const { createClient } = require('@supabase/supabase-js');
+const WebSocket = require('ws');
 const { money } = require('./precos');
 
 // Conexão criada na primeira consulta, não na importação. Com o createClient no
@@ -16,6 +17,13 @@ function sb() {
     }
     conexao = createClient(process.env.SUPA_URL, process.env.SUPA_SERVICE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
+      // O cliente monta um canal de realtime ao ser criado, e realtime exige
+      // WebSocket — que só é nativo a partir do Node 22. Este agente nunca usa
+      // realtime (quem usa é o painel, no navegador), mas sem uma implementação
+      // aqui toda consulta ao banco falhava com "native WebSocket not found".
+      // Entregar o `ws` explicitamente desacopla o agente da versão do Node:
+      // funciona em 18, 20, 22 ou 24, seja qual for a que a hospedagem escolher.
+      realtime: { transport: WebSocket },
     });
   }
   return conexao;
