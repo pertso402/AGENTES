@@ -16,6 +16,15 @@ function sb() {
     }
     conexao = createClient(process.env.SUPA_URL, process.env.SUPA_SERVICE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
+      // O Next substitui o fetch global e guarda as respostas GET no Data
+      // Cache — inclusive as consultas que o cliente do Supabase faz por baixo.
+      // O efeito é o banco parecer congelado no servidor: uma rota via 2 leads
+      // e outra via 1 ao mesmo tempo, e o disparo poderia montar a oferta com
+      // um cardápio que você acabou de editar no Setup. Aqui nada é cacheável:
+      // é tudo estado que muda no meio da demo.
+      global: {
+        fetch: (url, opcoes = {}) => fetch(url, { ...opcoes, cache: 'no-store' }),
+      },
     });
   }
   return conexao;
