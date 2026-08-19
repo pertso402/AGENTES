@@ -3,9 +3,23 @@
 const { createClient } = require('@supabase/supabase-js');
 const { money } = require('./precos');
 
-const sb = createClient(process.env.SUPA_URL, process.env.SUPA_SERVICE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+// Conexão criada na primeira consulta, não na importação. Com o createClient no
+// topo do módulo, uma variável de ambiente ausente matava o processo na
+// primeira linha — antes de o /health existir pra dizer QUAL variável faltava.
+// O container reiniciava em laço e a única pista era um 502 mudo.
+let conexao = null;
+
+function sb() {
+  if (!conexao) {
+    if (!process.env.SUPA_URL || !process.env.SUPA_SERVICE_KEY) {
+      throw new Error('Supabase não configurado: faltam SUPA_URL e/ou SUPA_SERVICE_KEY');
+    }
+    conexao = createClient(process.env.SUPA_URL, process.env.SUPA_SERVICE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+  return conexao;
+}
 
 function limparTelefone(telefone) {
   return String(telefone || '').replace(/\D/g, '');
@@ -19,18 +33,18 @@ function limparTelefone(telefone) {
 async function resolverRestaurante(telefone) {
   const tel = limparTelefone(telefone);
 
-  const { data: sessao } = await sb
+  const { data: sessao } = await sb()
     .from('demo_sessoes')
     .select('restaurante_id, expira_em')
     .eq('telefone', tel)
     .maybeSingle();
 
   if (sessao && new Date(sessao.expira_em) > new Date()) {
-    const { data } = await sb.from('restaurantes').select('*').eq('id', sessao.restaurante_id).maybeSingle();
+    const { data } = await sb().from('restaurantes').select('*').eq('id', sessao.restaurante_id).maybeSingle();
     if (data) return data;
   }
 
-  const { data: ativo } = await sb
+  const { data: ativo } = await sb()
     .from('restaurantes')
     .select('*')
     .eq('ativo', true)
@@ -41,7 +55,7 @@ async function resolverRestaurante(telefone) {
 }
 
 async function buscarProdutos(restauranteId) {
-  const { data, error } = await sb
+  const { data, error } = await sb()
     .from('produtos')
     .select('*')
     .eq('restaurante_id', restauranteId)
@@ -57,7 +71,7 @@ async function buscarProdutos(restauranteId) {
 // uma conversa longa faria o agente responder ao começo da conversa achando
 // que era o agora.
 async function carregarHistorico(restauranteId, telefone, limite = 16) {
-  const { data, error } = await sb
+  const { data, error } = await sb()
     .from('mensagens')
     .select('role, conteudo')
     .eq('restaurante_id', restauranteId)
@@ -70,7 +84,7 @@ async function carregarHistorico(restauranteId, telefone, limite = 16) {
 }
 
 async function salvarMensagem(restauranteId, telefone, role, conteudo) {
-  const { error } = await sb.from('mensagens').insert({
+  const { error } = await sb().from('mensagens').insert({
     restaurante_id: restauranteId,
     telefone: limparTelefone(telefone),
     role,
@@ -82,7 +96,7 @@ async function salvarMensagem(restauranteId, telefone, role, conteudo) {
 // ─── RASCUNHO ────────────────────────────────────────────────────────────────
 
 async function carregarRascunho(restauranteId, telefone) {
-  const { data } = await sb
+  const { data } = await sb()
     .from('pedido_rascunho')
     .select('*')
     .eq('restaurante_id', restauranteId)
@@ -92,7 +106,7 @@ async function carregarRascunho(restauranteId, telefone) {
 }
 
 async function salvarRascunho(restauranteId, telefone, campos) {
-  const { data, error } = await sb
+  const { data, error } = await sb()
     .from('pedido_rascunho')
     .upsert(
       {
@@ -113,7 +127,7 @@ async function salvarRascunho(restauranteId, telefone, campos) {
 // cliente mandar "sim" duas vezes seguidas (ou mandar "sim" e "isso" picados),
 // a segunda tentativa encontra a etapa já mudada e não grava um pedido gêmeo.
 async function tentarIniciarConfirmacao(restauranteId, telefone) {
-  const { data } = await sb
+  const { data } = await sb()
     .from('pedido_rascunho')
     .update({ etapa_atual: 'confirmando' })
     .eq('restaurante_id', restauranteId)
@@ -125,7 +139,7 @@ async function tentarIniciarConfirmacao(restauranteId, telefone) {
 }
 
 async function limparRascunho(restauranteId, telefone) {
-  await sb
+  await sb()
     .from('pedido_rascunho')
     .delete()
     .eq('restaurante_id', restauranteId)
@@ -137,7 +151,7 @@ async function limparRascunho(restauranteId, telefone) {
 async function garantirCliente(restauranteId, telefone, nome) {
   const tel = limparTelefone(telefone);
 
-  const { data: existente } = await sb
+  const { data: existente } = await sb()
     .from('clientes')
     .select('*')
     .eq('restaurante_id', restauranteId)
@@ -148,13 +162,13 @@ async function garantirCliente(restauranteId, telefone, nome) {
     // Não sobrescreve um nome real por "Cliente" — o disparo pode ter cadastrado
     // o nome certo antes de a conversa começar.
     if (nome && nome !== 'Cliente' && existente.nome !== nome) {
-      await sb.from('clientes').update({ nome }).eq('id', existente.id);
+      await sb().from('clientes').update({ nome }).eq('id', existente.id);
       return { ...existente, nome };
     }
     return existente;
   }
 
-  const { data, error } = await sb
+  const { data, error } = await sb()
     .from('clientes')
     .insert({ restaurante_id: restauranteId, telefone: tel, nome: nome || 'Cliente' })
     .select()
@@ -168,7 +182,7 @@ async function garantirCliente(restauranteId, telefone, nome) {
 async function buscarCupomAtivo(clienteId) {
   const hoje = new Date().toISOString().slice(0, 10);
 
-  const { data } = await sb
+  const { data } = await sb()
     .from('cupons')
     .select('*')
     .eq('cliente_id', clienteId)
@@ -185,7 +199,7 @@ async function buscarCupomAtivo(clienteId) {
 // Grava o pedido inteiro. O número sequencial por restaurante é responsabilidade
 // do trigger no banco, não daqui.
 async function criarPedido({ restauranteId, cliente, rascunho, itens, totais, cupom }) {
-  const { data: pedido, error } = await sb
+  const { data: pedido, error } = await sb()
     .from('pedidos')
     .insert({
       restaurante_id: restauranteId,
@@ -207,7 +221,7 @@ async function criarPedido({ restauranteId, cliente, rascunho, itens, totais, cu
     .single();
   if (error) throw new Error(`db/criarPedido: ${error.message}`);
 
-  const { error: errItens } = await sb.from('itens_pedido').insert(
+  const { error: errItens } = await sb().from('itens_pedido').insert(
     itens.map((i) => ({
       pedido_id: pedido.id,
       produto_id: i.produto_id,
@@ -223,19 +237,19 @@ async function criarPedido({ restauranteId, cliente, rascunho, itens, totais, cu
   // As três chamadas abaixo são melhor esforço: o pedido já existe e já está no
   // painel. Falhar aqui não pode desfazer uma venda.
   if (totais.cupomAplicado) {
-    await sb
+    await sb()
       .from('cupons')
       .update({ usado: true, pedido_id: pedido.id })
       .eq('id', totais.cupomAplicado.id)
       .eq('usado', false)   // condição evita dar baixa duas vezes numa corrida
-      .then(() => sb
+      .then(() => sb()
         .from('ofertas_enviadas')
         .update({ converteu: true, pedido_convertido_id: pedido.id })
         .eq('cupom_id', totais.cupomAplicado.id))
       .catch(() => {});
   }
 
-  await sb
+  await sb()
     .from('clientes')
     .update({
       total_pedidos: (cliente.total_pedidos || 0) + 1,
@@ -254,7 +268,7 @@ async function criarPedido({ restauranteId, cliente, rascunho, itens, totais, cu
 // Nunca lança: um erro ao gravar log não pode derrubar um atendimento.
 async function log(nivel, etapa, dados = {}) {
   try {
-    await sb.from('agent_logs').insert({
+    await sb().from('agent_logs').insert({
       restaurante_id: dados.restauranteId || null,
       telefone: dados.telefone || null,
       nivel,
