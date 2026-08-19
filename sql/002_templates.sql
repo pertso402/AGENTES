@@ -55,7 +55,7 @@ select r.id, p.nome, p.descricao, p.categoria, p.preco, p.destaque, p.ordem, p.v
 from public.restaurantes r,
      (values
         ('X-Bacon Artesanal',          'Blend 180g, cheddar inglês, bacon crocante e maionese da casa', 'Burgers', 32.90, true,  1,
-         'https://mhonpvgdklrapcdfovmv.supabase.co/storage/v1/object/public/video%20burguer/food%20porn.mp4'),
+         'https://mhonpvgdklrapcdfovmv.supabase.co/storage/v1/object/public/demo-midia/templates/hamburgueria.mp4'),
         ('X-Salada Artesanal',         'Blend 180g, queijo prato, alface, tomate e cebola roxa', 'Burgers', 28.90, false, 2, null),
         ('Smash Duplo',                'Dois smashs 90g, queijo cheddar duplo e picles', 'Burgers', 34.90, false, 3, null),
         ('Batata Frita com Cheddar e Bacon', 'Porção 400g', 'Porções', 24.90, false, 4, null),
@@ -169,6 +169,28 @@ from public.restaurantes r,
      ) as p(nome, descricao, categoria, preco, destaque, ordem)
 where r.slug = 'template-doceria'
 on conflict (restaurante_id, nome) do nothing;
+
+-- ─── VÍDEOS DE VITRINE DOS MODELOS ──────────────────────────────────────────
+-- É o vídeo que sai junto com a oferta, então é ele que faz o dono do
+-- restaurante parar pra olhar. Ficam no nosso próprio bucket de propósito:
+-- vídeo hospedado em projeto de terceiro quebra quando aquele projeto pausa —
+-- e quebraria exatamente durante uma visita.
+--
+-- Marmitaria, pizzaria e japonesa ainda não têm vídeo. Sem mídia, a oferta sai
+-- só com texto: funciona, mas perde a parte que dá fome.
+
+update public.produtos p
+   set video_url = 'https://mhonpvgdklrapcdfovmv.supabase.co/storage/v1/object/public/demo-midia/templates/'
+                   || case r.slug
+                        when 'template-hamburgueria' then 'hamburgueria'
+                        when 'template-acai'         then 'acai'
+                        when 'template-doceria'      then 'doceria'
+                      end || '.mp4',
+       imagem_url = null
+  from public.restaurantes r
+ where p.restaurante_id = r.id
+   and p.destaque
+   and r.slug in ('template-hamburgueria', 'template-acai', 'template-doceria');
 
 -- ─── Conferência ────────────────────────────────────────────────────────────
 -- select r.slug, r.nome, count(p.id) as produtos
