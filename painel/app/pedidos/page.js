@@ -26,10 +26,11 @@ const PROXIMO = {
 const ABAS = ['pendente', 'preparando', 'pronto', 'entregue', 'cancelado'];
 
 export default function Pedidos() {
-  const { tenant, tenantId } = useTenant();
+  const { tenant, tenantId, restaurantes, trocarTenant } = useTenant();
   const [pedidos, setPedidos] = useState([]);
   const [aba, setAba] = useState('pendente');
   const [carregando, setCarregando] = useState(true);
+  const [emOutro, setEmOutro] = useState(null);
   const conhecidos = useRef(new Set());
 
   const carregar = useCallback(async () => {
@@ -44,6 +45,26 @@ export default function Pedidos() {
 
     setPedidos(data || []);
     setCarregando(false);
+
+    // Sem pedidos aqui, procura em outro restaurante. Numa demo, "não chegou
+    // pedido" e "o pedido chegou no restaurante que não está selecionado" ficam
+    // idênticos na tela — e o dono está olhando junto. O agente resolve o
+    // restaurante pela sessão do telefone, então essa divergência acontece
+    // sozinha se o painel foi trocado depois do disparo.
+    if (!data?.length) {
+      const { data: fora } = await sb()
+        .from('pedidos')
+        .select('restaurante_id')
+        .neq('restaurante_id', tenantId)
+        .order('criado_em', { ascending: false })
+        .limit(20);
+
+      const outro = fora?.[0]?.restaurante_id || null;
+      setEmOutro(outro ? { id: outro, quantos: fora.length } : null);
+    } else {
+      setEmOutro(null);
+    }
+
     return data || [];
   }, [tenantId]);
 
@@ -120,11 +141,25 @@ export default function Pedidos() {
 
       {carregando && <div className="vazio">Carregando pedidos...</div>}
 
-      {!carregando && !visiveis.length && (
+      {!carregando && !visiveis.length && !emOutro && (
         <div className="vazio">
           Nenhum pedido aqui.
           <br />
           Os pedidos caem nesta tela sozinhos, assim que o cliente confirmar no WhatsApp.
+        </div>
+      )}
+
+      {!carregando && !pedidos.length && emOutro && (
+        <div className="aviso aviso-atencao">
+          Existe pedido em <b>{restaurantes.find((r) => r.id === emOutro.id)?.nome || 'outro restaurante'}</b>,
+          não em {tenant?.nome}. O agente usa o restaurante do disparo, e este painel está mostrando outro.
+          <button
+            className="btn btn-secundario btn-pequeno"
+            style={{ marginTop: 10 }}
+            onClick={() => trocarTenant(emOutro.id)}
+          >
+            Ver os pedidos de lá
+          </button>
         </div>
       )}
 
