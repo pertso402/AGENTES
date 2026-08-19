@@ -35,7 +35,7 @@ export default function Pedidos() {
   const carregar = useCallback(async () => {
     if (!tenantId) return;
 
-    const { data } = await sb
+    const { data } = await sb()
       .from('pedidos')
       .select('*, clientes(nome, telefone), itens_pedido(*), cupons(codigo, desconto_percentual)')
       .eq('restaurante_id', tenantId)
@@ -62,7 +62,7 @@ export default function Pedidos() {
   useEffect(() => {
     if (!tenantId) return;
 
-    const canal = sb
+    const canal = sb()
       .channel(`pedidos-${tenantId}`)
       .on(
         'postgres_changes',
@@ -79,7 +79,7 @@ export default function Pedidos() {
       )
       .subscribe();
 
-    return () => { sb.removeChannel(canal); };
+    return () => { sb().removeChannel(canal); };
   }, [tenantId, carregar]);
 
   async function avancar(pedido) {
@@ -88,13 +88,13 @@ export default function Pedidos() {
     if (!proximo) return;
 
     setPedidos((lista) => lista.map((p) => (p.id === pedido.id ? { ...p, status: proximo } : p)));
-    await sb.from('pedidos').update({ status: proximo }).eq('id', pedido.id);
+    await sb().from('pedidos').update({ status: proximo }).eq('id', pedido.id);
   }
 
   async function cancelar(pedido) {
     if (!window.confirm(`Cancelar o pedido #${pedido.numero_pedido}?`)) return;
     setPedidos((lista) => lista.map((p) => (p.id === pedido.id ? { ...p, status: 'cancelado' } : p)));
-    await sb.from('pedidos').update({ status: 'cancelado' }).eq('id', pedido.id);
+    await sb().from('pedidos').update({ status: 'cancelado' }).eq('id', pedido.id);
   }
 
   if (!tenant) return <div className="vazio">Escolha um restaurante na aba Disparar.</div>;
