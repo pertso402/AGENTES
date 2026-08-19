@@ -243,6 +243,10 @@ app.get('/health', async (_req, res) => {
     banco,
     tenantAtivo,
     modelo: process.env.OPENAI_MODEL || 'gpt-4o',
+    // A versão fica exposta porque já custou tempo: o cliente do Supabase
+    // precisa de Node 22+, e no container antigo a única pista era o erro de
+    // WebSocket. Assim dá pra ver de fora qual imagem está rodando.
+    node: process.version,
   });
 });
 
