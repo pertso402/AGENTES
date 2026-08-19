@@ -176,13 +176,15 @@ on conflict (restaurante_id, nome) do nothing;
 -- vídeo hospedado em projeto de terceiro quebra quando aquele projeto pausa —
 -- e quebraria exatamente durante uma visita.
 --
--- Marmitaria, pizzaria e japonesa ainda não têm vídeo. Sem mídia, a oferta sai
--- só com texto: funciona, mas perde a parte que dá fome.
+-- A japonesa ainda não tem vídeo. Sem mídia a oferta sai só com áudio e texto:
+-- funciona, mas perde a parte que dá fome — e o painel avisa em amarelo.
 
 update public.produtos p
    set video_url = 'https://mhonpvgdklrapcdfovmv.supabase.co/storage/v1/object/public/demo-midia/templates/'
                    || case r.slug
+                        when 'template-pizzaria'     then 'pizzaria'
                         when 'template-hamburgueria' then 'hamburgueria'
+                        when 'template-marmitaria'   then 'marmitaria'
                         when 'template-acai'         then 'acai'
                         when 'template-doceria'      then 'doceria'
                       end || '.mp4',
@@ -190,7 +192,8 @@ update public.produtos p
   from public.restaurantes r
  where p.restaurante_id = r.id
    and p.destaque
-   and r.slug in ('template-hamburgueria', 'template-acai', 'template-doceria');
+   and r.slug in ('template-pizzaria', 'template-hamburgueria', 'template-marmitaria',
+                  'template-acai', 'template-doceria');
 
 -- ─── Conferência ────────────────────────────────────────────────────────────
 -- select r.slug, r.nome, count(p.id) as produtos
