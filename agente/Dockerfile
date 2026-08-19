@@ -1,4 +1,8 @@
-FROM node:20-alpine
+# Node 22, não 20: o cliente do Supabase usa o WebSocket nativo, que só existe
+# de forma estável a partir do 22. No 20 o agente sobe, mas toda consulta ao
+# banco falha com "native WebSocket not found" — e a máquina de desenvolvimento
+# (Node 24) não reproduzia o problema.
+FROM node:22-alpine
 
 WORKDIR /app
 
